@@ -160,6 +160,10 @@ def carregar_e_processar_dados(origem_dados):
     ) if 'Run Date/Time' in df.columns else pd.NaT
 
     diff_calculada = (df['Run_DT'] - df['Stop_DT']).dt.total_seconds() / 3600.0
+    diff_calculada = diff_calculada.apply(lambda h: h if (pd.notna(h) and 0 <= h <= MAX_DOWNTIME_HOURS_THRESHOLD) else None)
+    
+    df['Downtime_Horas'] = df['Downtime_Horas'].combine_first(diff_calculada)
+    df['Downtime_Horas_Calculo'] = df['Downtime_Horas'].fillna(0.0).clip(lower=0.0)
 
     # 2. Vento e Fator de Carga Unitário (MWh por cada MW instalado)
     df['Wind_Speed_Num'] = df['Wind Speed'].apply(parse_wind_speed) if 'Wind Speed' in df.columns else np.nan
