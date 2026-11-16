@@ -101,8 +101,8 @@ total_downtime = df_f['Downtime_Horas_Calculo'].sum()
 total_mwh = df_f['Perdas_MWh'].sum()
 total_eur = df_f['Impacto_Financeiro_EUR'].sum()
 
-rearmes_sucesso = len(df_avarias[df_avarias['Intervencao_Operacional'] == 'Rearme Remoto com Sucesso'])
-rearmes_tentados = len(df_avarias[df_avarias['Intervencao_Operacional'].str.contains('Rearme Remoto', na=False)])
+rearmes_sucesso = len(df_avarias[df_avarias['Intervencao_Operacional'] == '1. Remote Reset Bem Sucedido'])
+rearmes_tentados = len(df_avarias[df_avarias['Intervencao_Operacional'].isin(['1. Remote Reset Bem Sucedido', '2. Remote Reset Sem Sucesso'])])
 taxa_tentativa = (rearmes_tentados / total_avarias * 100) if total_avarias > 0 else 0
 taxa_eficacia = (rearmes_sucesso / rearmes_tentados * 100) if rearmes_tentados > 0 else 0
 
@@ -140,7 +140,24 @@ with tab1:
         st.plotly_chart(charts.criar_grafico_subsistemas(df_f), use_container_width=True)
     with c4:
         st.subheader("Desfecho das Intervenções (Sala de Controlo)")
-        st.plotly_chart(charts.criar_grafico_rearme(df_f), use_container_width=True)
+        fig_rearme, df_rearme_resumo = charts.criar_grafico_rearme(df_f)
+        st.plotly_chart(fig_rearme, use_container_width=True)
+
+        if not df_rearme_resumo.empty:
+            st.dataframe(
+                df_rearme_resumo[['Intervencao_Operacional', 'Total', 'Downtime_Medio_h', 'Downtime_Total_h']].rename(columns={
+                    'Intervencao_Operacional': 'Cenário',
+                    'Total': 'Qtd.',
+                    'Downtime_Medio_h': 'MTTR Médio (h)',
+                    'Downtime_Total_h': 'Downtime Total (h)'
+                }),
+                column_config={
+                    "MTTR Médio (h)": st.column_config.NumberColumn(format="%.2f h"),
+                    "Downtime Total (h)": st.column_config.NumberColumn(format="%.1f h")
+                },
+                use_container_width=True,
+                hide_index=True
+            )
 
 with tab2:
     fig_dt, fig_turnos = charts.criar_graficos_downtime_e_turnos(df_f)

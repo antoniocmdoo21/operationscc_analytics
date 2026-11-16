@@ -54,13 +54,13 @@ MAX_DOWNTIME_HOURS_THRESHOLD = 720.0
 # =============================================================
 # 4. PALETAS DE CORES CONSISTENTES (PLOTLY)
 # =============================================================
+
 COLOR_MAP_REARME = {
-    'Rearme Remoto com Sucesso': '#10B981',                          # Verde Esmeralda
-    'Rearme Remoto Falhado (Escalado por Email)': '#EF4444',         # Vermelho Coral
-    'Intervenção Local / Sem Permissão (Email Enviado)': '#F59E0B',  # Âmbar
-    'Notificação / Escalamento (Email Enviado)': '#3B82F6',          # Azul Elétrico
-    'Normalizada sem Intervenção Registada': '#8B5CF6',              # Roxo Suave
-    'Pendente / Sem Ação Registada': '#6B7280'                       # Cinza Ardósia
+    '1. Remote Reset Bem Sucedido': '#10B981',          # Verde Esmeralda
+    '2. Remote Reset Sem Sucesso': '#EF4444',           # Vermelho Coral
+    '4. Intervenção Local': '#F59E0B',                  # Âmbar / Laranja
+    '3. Sem Permissão Contratual de Rearme': '#3B82F6', # Azul Elétrico
+    'Outros / Auto-Reset / Sem Registo': '#6B7280'      # Cinza Neutro
 }
 
 COLOR_MAP_TIPOLOGIA = {

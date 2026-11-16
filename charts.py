@@ -53,19 +53,43 @@ def criar_grafico_subsistemas(df):
 def criar_grafico_rearme(df):
     df_avarias = df[df['Tipo_Evento'] == 'Avaria / Alarme Operacional']
     if df_avarias.empty:
-        return go.Figure()
-    counts = df_avarias['Intervencao_Operacional'].value_counts().reset_index()
-    counts.columns = ['Intervencao', 'Total']
-    fig = px.pie(
-        counts, names='Intervencao', values='Total', hole=0.5,
-        color='Intervencao', color_discrete_map=COLOR_MAP_REARME
+        return go.Figure(), df_avarias
+
+    resumo = (
+        df_avarias.groupby('Intervencao_Operacional')
+        .agg(
+            Total=('Intervencao_Operacional', 'count'),
+            Downtime_Medio_h=('Downtime_Horas_Calculo', 'mean'),
+            Downtime_Total_h=('Downtime_Horas_Calculo', 'sum')
+        )
+        .reset_index()
+        .sort_values(by='Intervencao_Operacional', ascending=True)
     )
-    fig.update_traces(textinfo='percent+value', textposition='outside')
+
+    fig = px.pie(
+        resumo,
+        names='Intervencao_Operacional',
+        values='Total',
+        hole=0.52,
+        color='Intervencao_Operacional',
+        color_discrete_map=COLOR_MAP_REARME
+    )
+    fig.update_traces(
+        textinfo='percent+value',
+        textposition='outside',
+        sort=False  # Mantém a ordem exata: Cenário 1 -> 2 -> 3 -> 4 -> Outros
+    )
     fig.update_layout(
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="center", x=0.5)
+        legend=dict(orientation="h", yanchor="bottom", y=-0.38, xanchor="center", x=0.5)
     )
-    return aplicar_estilo_padrao(fig, 420)
+    fig.update_traces(
+        textinfo='percent+value',
+        textposition='outside',
+        sort=False,
+        hovertemplate="<b>%{label}</b><br>Ocorrências: %{value}<br>Quota: %{percent}<extra></extra>"
+    )
+    return aplicar_estilo_padrao(fig, 400), resumo
 
 def criar_graficos_downtime_e_turnos(df):
     dt_tipo = df.groupby('Tipo_Evento')['Downtime_Horas_Calculo'].sum().reset_index()

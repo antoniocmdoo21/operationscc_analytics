@@ -89,53 +89,77 @@ def processar_intervencao_operacional(row):
         return 'N/A (Operação Programada / Rede)'
 
     comments = str(row.get('Comments', '')).strip().lower()
-    resolution = str(row.get('Resolution', '')).strip().lower()
     perm = str(row.get('Rearm Permission', '')).strip().lower()
     cond = str(row.get('Reset Conditions', '')).strip().lower()
+    local_contact = str(row.get('Local contact used', '')).strip().lower()
     desc = str(row.get('Error Description', '')).lower()
     info = str(row.get('Additional Info', '')).lower()
     contexto_geral = f"{comments} {desc} {info}"
 
+    # ---------------------------------------------------------
+    # CENÁRIO 2: Remote Reset sem sucesso
+    # ---------------------------------------------------------
     termos_falha = [
         'falhou', 'falhado', 'ñ funcionou', 'não funcionou', 'nao funcionou',
-        'failed', 'sem sucesso', 'sem  sucesso', 'not work', 'unsuccessful',
+        'failed', 'sem sucesso', 'sem  sucesso', 'not work', 'unsuccessful', 'unsuccesful',
         'não limpou', 'nao limpou', 'não saiu o erro', 'voltou a parar',
         'voltou a estar faulted', 'deu erros', 'continua a aparecer'
     ]
     if any(k in comments for k in termos_falha):
-        return 'Rearme Remoto Falhado (Escalado por Email)'
+        return '2. Remote Reset Sem Sucesso'
 
+    # ---------------------------------------------------------
+    # CENÁRIO 1: Remote Reset bem sucedido
+    # ---------------------------------------------------------
     termos_sucesso = [
         'remote reset', 'reset efectuado', 'reset efetuado', 'reset performed',
         'reset ok', 'rearmada', 'rearme efetuado', 'rearme efectuado',
         'rearme com sucesso', 'rearme feito', 'rearme bem sucedido',
         'rearme realizado', 'reset com sucesso', 'levou reset', 'reset feito',
-        'reame feito', 'reamr efeito', 'restart com sucesso'
+        'reame feito', 'reamr efeito', 'restart com sucesso', 'reseted', 'rearmed'
     ]
-    termos_exclusao = [
+    termos_exclusao_reset = [
         'do not reset', 'não rearmar', 'nao rearmar', 'não realizar o rearme',
         'não se pode rearmar', 'nao se pode rearmar', 'manual reset',
-        'auto-reset', 'auto reset', 'stop das turbinas'
+        'auto-reset', 'auto reset', 'stop das turbinas', 'sem permissão', 'sem permissao'
     ]
     eh_reset_exato = comments in ['reset', 'reset.', 'rearme', 'rearme.']
-    if (eh_reset_exato or any(k in comments for k in termos_sucesso)) and not any(neg in comments for neg in termos_exclusao):
-        return 'Rearme Remoto com Sucesso'
+    if (eh_reset_exato or any(k in comments for k in termos_sucesso)) and not any(neg in comments for neg in termos_exclusao_reset):
+        return '1. Remote Reset Bem Sucedido'
 
-    termos_email = ['email', 'e-mail', 'mail', 'oncall', 'contactado', 'contacted', 'enviado', 'sent']
-    sem_permissao = (
-        perm in ['no', 'local', '-', 'não operamos', ''] or 
-        cond == 'local' or 
-        'without communication' in contexto_geral or 
-        'sem comunicações' in contexto_geral or
-        'sem comunicacao' in contexto_geral
-    )
-    if any(k in comments for k in termos_email):
-        return 'Intervenção Local / Sem Permissão (Email Enviado)' if sem_permissao else 'Notificação / Escalamento (Email Enviado)'
+    # ---------------------------------------------------------
+    # CENÁRIO 4: Intervenção Local (SOBREPÕE-SE SEMPRE AO CENÁRIO 3)
+    # ---------------------------------------------------------
+    termos_intervencao_local = [
+        'manual reset', 'reset manual', 'rearme manual', 'local reset', 'reset local',
+        'intervenção local', 'intervencao local', 'deslocação', 'deslocacao',
+        'equipa no local', 'técnico no local', 'tecnico no local', 'on site', 'on-site',
+        'local intervention', 'local team', 'o&m', 'manutenção', 'manutencao',
+        'oncall', 'on-call', 'chamada', 'ligado', 'ligou', 'telefone', 'phone',
+        'incidente', 'incident', 'ticket', 'nuo', 'portal',
+        'without communication', 'sem comunicações', 'sem comunicacao'
+    ]
+    tem_contacto_local = local_contact not in ['', '-', 'nan', 'none', 'no', 'não', 'nao']
+    
+    if cond == 'local' or tem_contacto_local or any(k in contexto_geral for k in termos_intervencao_local):
+        return '4. Intervenção Local'
 
-    if 'running again' in resolution:
-        return 'Normalizada sem Intervenção Registada'
+    # ---------------------------------------------------------
+    # CENÁRIO 3: Sem permissão contratual de Rearme
+    # ---------------------------------------------------------
+    termos_sem_permissao = [
+        'sem permissão', 'sem permissao', 'no permission', 'do not reset',
+        'não rearmar', 'nao rearmar', 'não realizar o rearme',
+        'não se pode rearmar', 'nao se pode rearmar', 'not allowed',
+        'não operamos', 'nao operamos'
+    ]
+    if perm in ['no', 'não', 'nao', 'não operamos', 'nao operamos'] or any(k in contexto_geral for k in termos_sem_permissao):
+        return '3. Sem Permissão Contratual de Rearme'
 
-    return 'Pendente / Sem Ação Registada'
+    # ---------------------------------------------------------
+    # RESIDUAL: Casos sem intervenção (Auto-reset, normalizadas sozinhas, etc.)
+    # ---------------------------------------------------------
+    return 'Outros / Auto-Reset / Sem Registo'
 
 def carregar_e_processar_dados(origem_dados):
     try:
