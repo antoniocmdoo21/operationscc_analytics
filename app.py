@@ -155,7 +155,7 @@ with tab2:
     st.info(f"💡 **Nota de Engenharia:** O cálculo de MWh perdidos aplica uma curva de potência cúbica ($v_{{cut-in}} = 3\\text{{ m/s}}$, $v_{{rated}} = 12\\text{{ m/s}}$) sobre a velocidade de vento registada em cada ocorrência, assumindo uma potência unitária de **{potencia_mw:.1f} MW**.")
 
 with tab3:
-    st.subheader("Ranking de Ativos Críticos (Bad Actors)")
+    st.subheader("Ranking de Ativos Críticos (Bad Actors por Parque)")
     col_cfg1, col_cfg2 = st.columns([1, 3])
     with col_cfg1:
         metrica_escolhida = st.radio(
@@ -164,8 +164,42 @@ with tab3:
         )
         top_n_escolhido = st.slider("Número de parques no ranking:", 5, 30, 12, 1)
     with col_cfg2:
-        fig_parques = charts.criar_grafico_incidentes_por_parque(df_f, top_n=top_n_escolhido, metrica=metrica_escolhida)
+        fig_parques = charts.criar_grafico_incidentes_por_parque(
+            df_f, top_n=top_n_escolhido, metrica=metrica_escolhida
+        )
         st.plotly_chart(fig_parques, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("🔍 Detalhe por Turbina: Máquinas Reincidentes e Tipo de Alarmes")
+
+    col_t1, col_t2 = st.columns([2, 1])
+    with col_t1:
+        lista_parques_drill = ["Todos os Parques Filtrados"] + sorted(df_f['Site'].dropna().unique().tolist())
+        parque_drill = st.selectbox(
+            "Isolar um parque específico para inspeção de turbinas (ou analisar toda a frota filtrada):",
+            options=lista_parques_drill
+        )
+    with col_t2:
+        top_n_turbinas = st.slider("Nº de turbinas a exibir:", 5, 25, 10, 1)
+
+    fig_turbinas, df_turbinas_resumo = charts.criar_analise_turbinas_criticas(
+        df_f, parque_selecionado=parque_drill, top_n=top_n_turbinas
+    )
+
+    if df_turbinas_resumo.empty:
+        st.info("Sem registos de turbinas individuais para os filtros selecionados.")
+    else:
+        st.plotly_chart(fig_turbinas, use_container_width=True)
+        
+        st.markdown("**Assinatura de Falhas por Turbina (Alarme Dominante)**")
+        st.dataframe(
+            df_turbinas_resumo.style.format({
+                'Downtime (h)': '{:.1f}',
+                'Perdas (MWh)': '{:.1f}'
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
 
 with tab4:
     st.subheader("Inspeção de Registos Tratados")

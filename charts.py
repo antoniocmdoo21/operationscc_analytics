@@ -117,3 +117,95 @@ def criar_grafico_incidentes_por_parque(df, top_n=12, metrica='Número de Incide
     )
     fig.update_traces(texttemplate=fmt, textposition='outside')
     return aplicar_estilo_padrao(fig, 440)
+
+def criar_analise_turbinas_criticas(df, parque_selecionado=None, top_n=12):
+    """
+    Gera um gráfico empilhado das turbinas com mais ocorrências e uma tabela
+    resumo com o código e descrição do alarme mais frequente em cada máquina.
+    """
+    df_sub = df.copy()
+    if parque_selecionado and parque_selecionado != "Todos os Parques Filtrados":
+        df_sub = df_sub[df_sub['Site'] == parque_selecionado]
+
+    # Filtrar apenas linhas com Asset válido (excluindo subestações genéricas ou vazios se desejado)
+    df_sub = df_sub[df_sub['Asset'].notna() & (df_sub['Asset'].astype(str).str.strip() != '')].copy()
+    df_sub['Asset_Clean'] = df_sub['Asset'].astype(str).str.strip()
+    df_sub['Turbina_Label'] = df_sub['Site'].astype(str).str.strip() + " | " + df_sub['Asset_Clean']
+
+    if df_sub.empty:
+        return go.Figure(), df_sub
+
+    # 1. Identificar as Top N turbinas por número de ocorrências
+    top_turbinas_idx = (
+        df_sub.groupby('Turbina_Label')
+        .size()
+        .sort_values(ascending=False)
+        .head(top_n)
+        .index
+    )
+    df_top = df_sub[df_sub['Turbina_Label'].isin(top_turbinas_idx)].copy()
+
+    # 2. Gráfico empilhado por Subsistema Técnico / Tipologia
+    df_top['Causa_Agrupada'] = df_top.apply(
+        lambda r: r['Categoria_Tecnica'] if r['Tipo_Evento'] == 'Avaria / Alarme Operacional' else r['Tipo_Evento'],
+        axis=1
+    )
+    agregado_grafico = (
+        df_top.groupby(['Turbina_Label', 'Causa_Agrupada'])
+        .size()
+        .reset_index(name='Ocorrências')
+    )
+
+    fig = px.bar(
+        agregado_grafico,
+        x='Ocorrências',
+        y='Turbina_Label',
+        color='Causa_Agrupada',
+        orientation='h',
+        text='Ocorrências',
+        labels={
+            'Turbina_Label': '',
+            'Ocorrências': 'Número de Alarmes / Paragens',
+            'Causa_Agrupada': 'Subsistema / Tipologia'
+        },
+        color_discrete_sequence=px.colors.qualitative.Set2
+    )
+    fig.update_layout(
+        barmode='stack',
+        yaxis={'categoryorder': 'total ascending'},
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
+    )
+    fig.update_traces(textposition='inside')
+    fig = aplicar_estilo_padrao(fig, 440)
+
+    # 3. Tabela de diagnóstico detalhado (Qual o alarme mais frequente em cada turbina)
+    def moda_segura(serie):
+        s = serie.dropna().astype(str).str.strip()
+        s = s[~s.isin(['', '-', 'nan', 'None'])]
+        return s.mode().iloc[0] if not s.empty else 'N/D'
+
+    tabela_resumo = (
+        df_top.groupby(['Site', 'Asset_Clean'])
+        .agg(
+            Ocorrencias=('Asset_Clean', 'count'),
+            Downtime_h=('Downtime_Horas_Calculo', 'sum'),
+            Perdas_MWh=('Perdas_MWh', 'sum'),
+            Codigo_Erro_Principal=('Error Code', moda_segura),
+            Descricao_Alarme_Frequente=('Error Description', moda_segura),
+            Subsistema_Dominante=('Causa_Agrupada', moda_segura)
+        )
+        .reset_index()
+        .sort_values(by='Ocorrencias', ascending=False)
+        .rename(columns={
+            'Site': 'Parque',
+            'Asset_Clean': 'Turbina',
+            'Ocorrencias': 'Alarmes',
+            'Downtime_h': 'Downtime (h)',
+            'Perdas_MWh': 'Perdas (MWh)',
+            'Codigo_Erro_Principal': 'Código Principal',
+            'Descricao_Alarme_Frequente': 'Alarme Mais Frequente',
+            'Subsistema_Dominante': 'Categoria Dominante'
+        })
+    )
+
+    return fig, tabela_resumo
